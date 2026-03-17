@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>どこいこ？</title>
+    <link rel="stylesheet" href="bootstrap/bootstrap.min.css">
+</head>
+
+<body class="bg-light">
+    <!-- 画面全体を使うコンテナ -->
+    <div class="container min-vh-100 d-flex align-items-center justify-content-center">
+        <!-- 中央のコンテンツ -->
+        <div class="card shadow p-4" style="max-width: 500px; width: 100%;">
+            <h1 class="text-center mb-4">どこいこ？</h1>
+            <p class="text-center">路線を選択してください。</p>
+            <div class="d-flex justify-content-center">
+                <select id="select-line" class="form-select w-50">
+                    <option value="" selected>--指定なし--</option>
+                </select>
+            </div>
+            <div class="text-center mt-4">
+                <button id="go-button" type="button" class="btn btn-primary" data-bs-toggle="modal"
+                    data-bs-target="#modal">ここいこ！</button>
+            </div>
+        </div>
+    </div>
+    <!-- Scrollable modal -->
+    <div id="modal" class="modal fade" tabindex="-1" aria-labelledby="modalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-body">
+                    <h3 id="selected-line" class="text-center"></h3>
+                    <h2 id="selected-station" class="text-center"></h2>
+                    <iframe id="map" width="100%" height="300" style="border:0;" loading="lazy"></iframe>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        // 大阪府の路線情報を取得してセレクトボックスに追加
+        fetch("https://www.heartrails-express.com/api/json?method=getLines&prefecture=%E5%A4%A7%E9%98%AA%E5%BA%9C")
+            .then((response) => response.json())
+            .then((json) => {
+                const selectLine = document.getElementById("select-line");
+                for (const line of json.response.line) {
+                    const option = document.createElement("option");
+                    option.value = line;
+                    option.textContent = line;
+                    selectLine.appendChild(option);
+                }
+            });
+
+        // ボタンがクリックされたときの処理
+        document.getElementById("go-button").addEventListener("click", () => {
+            // 選択された路線を取得
+            const selectLine = document.getElementById("select-line");
+            const selectedLine = selectLine.value;
+
+            if (selectedLine === "") {
+                fetch("https://www.heartrails-express.com/api/json?method=getLines&prefecture=%E5%A4%A7%E9%98%AA%E5%BA%9C")
+                    .then((response) => response.json())
+                    .then((json) => {
+                        // 路線一覧を取得
+                        const arr = json.response.line;
+                        // ランダムに路線を選択
+                        const randomLine = arr[Math.floor(Math.random() * arr.length)];
+                        // 選択された路線に基づいて駅情報を取得
+                        getRandomStation(randomLine);
+                    });
+            } else {
+                // 選択された路線に基づいて駅情報を取得
+                getRandomStation(selectedLine);
+            }
+        });
+
+        // ランダムな駅を選択する関数
+        function getRandomStation(selectedLine) {
+            // 選択された路線に基づいて駅情報を取得
+            fetch("https://www.heartrails-express.com/api/json?method=getStations&line=" + encodeURIComponent(selectedLine))
+                .then((response) => response.json())
+                .then((json) => {
+                    // 駅一覧を取得
+                    const arr = json.response.station;
+                    // ランダムに駅を選択
+                    const randomItem = arr[Math.floor(Math.random() * arr.length)];
+                    // モーダルに駅情報を表示
+                    const modalBody = document.querySelector("#modal .modal-body");
+                    document.getElementById("selected-line").textContent = selectedLine;
+                    document.getElementById("selected-station").textContent = randomItem.name;
+                    // Google Mapsに駅の位置を表示
+                    const lat = randomItem.y;
+                    const lng = randomItem.x;
+                    document.getElementById("map").src =
+                        `https://maps.google.com/maps?q=${lat},${lng}&z=15&output=embed`;
+                });
+        }
+    </script>
+    <script src="bootstrap/bootstrap.min.js"></script>
+</body>
+
+
+
+
+</html>
