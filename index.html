@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>どこいこ？</title>
+    <title>どこいこ？(全国版)</title>
     <link rel="stylesheet" href="bootstrap/bootstrap.min.css">
 </head>
 
@@ -13,14 +13,24 @@
     <div class="container min-vh-100 d-flex align-items-center justify-content-center">
         <!-- 中央のコンテンツ -->
         <div class="card shadow p-4" style="max-width: 500px; width: 100%;">
-            <h1 class="text-center mb-4">どこいこ？</h1>
-            <p class="text-center">路線を選択してください。</p>
-            <div class="d-flex justify-content-center">
-                <select id="select-line" class="form-select w-50">
-                    <option value="" selected>--指定なし--</option>
-                </select>
+            <h1 class="text-center mb-4">どこいこ？(全国版)</h1>
+            <div class="mb-4">
+                <p class="text-center">都道府県を選択してください。</p>
+                <div class="d-flex justify-content-center">
+                    <select id="select-pref" class="form-select w-50">
+                        <option value="" selected>--指定なし--</option>
+                    </select>
+                </div>
             </div>
-            <div class="text-center mt-4">
+            <div class="mb-4">
+                <p class="text-center">路線を選択してください。</p>
+                <div class="d-flex justify-content-center">
+                    <select id="select-line" class="form-select w-50">
+                        <option value="" selected>--指定なし--</option>
+                    </select>
+                </div>
+            </div>
+            <div class="text-center">
                 <button id="go-button" type="button" class="btn btn-primary" data-bs-toggle="modal"
                     data-bs-target="#modal">ここいこ！</button>
             </div>
@@ -39,46 +49,107 @@
         </div>
     </div>
     <script>
-        // 大阪府の路線情報を取得してセレクトボックスに追加
-        fetch("https://www.heartrails-express.com/api/json?method=getLines&prefecture=%E5%A4%A7%E9%98%AA%E5%BA%9C")
+        // URLパラメータから都道府県を取得
+        const urlParams = new URLSearchParams(window.location.search);
+        const prefParam = urlParams.get("pref");
+
+        // 都道府県の情報を取得してセレクトボックスに追加
+        fetch("https://www.heartrails-express.com/api/json?method=getPrefectures")
             .then((response) => response.json())
             .then((json) => {
-                const selectLine = document.getElementById("select-line");
-                for (const line of json.response.line) {
+                const selectPref = document.getElementById("select-pref");
+                for (const pref of json.response.prefecture) {
                     const option = document.createElement("option");
-                    option.value = line;
-                    option.textContent = line;
-                    selectLine.appendChild(option);
+                    option.value = pref;
+                    option.textContent = pref;
+                    selectPref.appendChild(option);
+                    // URLパラメータに都道府県が指定されている場合は、その都道府県を選択状態にする
+                    if (pref === prefParam) {
+                        option.selected = true;
+                    }
+                }
+
+                // URLパラメータに都道府県が指定されている場合は、その都道府県に基づいて路線情報を取得してセレクトボックスに追加
+                if (prefParam) {
+                    fetch("https://www.heartrails-express.com/api/json?method=getLines&prefecture=" + encodeURIComponent(prefParam))
+                        .then((response) => response.json())
+                        .then((json) => {
+                            const selectLine = document.getElementById("select-line");
+                            for (const line of json.response.line) {
+                                const option = document.createElement("option");
+                                option.value = line;
+                                option.textContent = line;
+                                selectLine.appendChild(option);
+                            }
+                        });
                 }
             });
 
+        // 都道府県が選択されたときの処理
+        document.getElementById("select-pref").addEventListener("change", (event) => {
+            const selectedPref = event.target.value;
+            const selectLine = document.getElementById("select-line");
+            // 路線のセレクトボックスをリセット
+            selectLine.innerHTML = '<option value="" selected>--指定なし--</option>';
+            if (selectedPref !== "") {
+                // 選択された都道府県に基づいて路線情報を取得してセレクトボックスに追加
+                fetch("https://www.heartrails-express.com/api/json?method=getLines&prefecture=" + encodeURIComponent(selectedPref))
+                    .then((response) => response.json())
+                    .then((json) => {
+                        for (const line of json.response.line) {
+                            const option = document.createElement("option");
+                            option.value = line;
+                            option.textContent = line;
+                            selectLine.appendChild(option);
+                        }
+                    });
+            }
+        });
+
         // ボタンがクリックされたときの処理
         document.getElementById("go-button").addEventListener("click", () => {
+            // 選択された都道府県を取得
+            const selectPref = document.getElementById("select-pref");
+            const selectedPref = selectPref.value;
             // 選択された路線を取得
             const selectLine = document.getElementById("select-line");
             const selectedLine = selectLine.value;
 
-            if (selectedLine === "") {
-                fetch("https://www.heartrails-express.com/api/json?method=getLines&prefecture=%E5%A4%A7%E9%98%AA%E5%BA%9C")
+            if (selectedPref !== "" && selectedLine !== "") {
+                // 選択された都道府県と路線に基づいて駅情報を取得してランダムに駅を選択
+                getRandomStation(selectedPref, selectedLine);
+            } else if (selectedPref !== "" && selectedLine === "") {
+                // 選択された都道府県に基づいて路線情報を取得してランダムに路線を選択し、その路線に基づいて駅情報を取得してランダムに駅を選択
+                fetch("https://www.heartrails-express.com/api/json?method=getLines&prefecture=" + encodeURIComponent(selectedPref))
                     .then((response) => response.json())
                     .then((json) => {
-                        // 路線一覧を取得
                         const arr = json.response.line;
-                        // ランダムに路線を選択
                         const randomLine = arr[Math.floor(Math.random() * arr.length)];
-                        // 選択された路線に基づいて駅情報を取得
-                        getRandomStation(randomLine);
+                        getRandomStation(selectedPref, randomLine);
                     });
             } else {
-                // 選択された路線に基づいて駅情報を取得
-                getRandomStation(selectedLine);
+                // ランダムで都道府県を取得
+                fetch("https://www.heartrails-express.com/api/json?method=getPrefectures")
+                    .then((response) => response.json())
+                    .then((json) => {
+                        const arr = json.response.prefecture;
+                        const randomPref = arr[Math.floor(Math.random() * arr.length)];
+                        // ランダムで路線を取得
+                        fetch("https://www.heartrails-express.com/api/json?method=getLines&prefecture=" + encodeURIComponent(randomPref))
+                            .then((response) => response.json())
+                            .then((json) => {
+                                const arr = json.response.line;
+                                const randomLine = arr[Math.floor(Math.random() * arr.length)];
+                                getRandomStation(randomPref, randomLine);
+                            });
+                    });
             }
         });
 
         // ランダムな駅を選択する関数
-        function getRandomStation(selectedLine) {
-            // 選択された路線に基づいて駅情報を取得
-            fetch("https://www.heartrails-express.com/api/json?method=getStations&line=" + encodeURIComponent(selectedLine))
+        function getRandomStation(selectedPref, selectedLine) {
+            // 選択された都道府県と路線に基づいて駅情報を取得
+            fetch("https://www.heartrails-express.com/api/json?method=getStations&prefecture=" + encodeURIComponent(selectedPref) + "&line=" + encodeURIComponent(selectedLine))
                 .then((response) => response.json())
                 .then((json) => {
                     // 駅一覧を取得
